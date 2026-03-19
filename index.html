@@ -55,7 +55,7 @@
   }
   .card {
     background: var(--card); border-radius: 16px; padding: 12px;
-    border: 1px solid var(--border); transition: border-color 0.3s;
+    border: 1.5px solid var(--border); transition: border-color 0.3s;
   }
   .card-name { font-size: 12px; font-weight: 500; line-height: 1.3; margin-bottom: 10px; }
   .slider-wrap { position: relative; }
@@ -93,10 +93,6 @@
     display: flex; align-items: center; justify-content: space-around;
     padding: 12px 16px 28px;
   }
-  .bottom-stat { text-align: center; }
-  .bottom-stat .val { font-size: 20px; font-weight: 700; }
-  .bottom-stat .lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
-
   .reset-btn {
     background: #222; border: 1px solid #333; color: var(--text);
     padding: 8px 16px; border-radius: 20px; font-size: 12px;
@@ -118,18 +114,6 @@
 <div id="content"></div>
 
 <div class="bottom-bar">
-  <div class="bottom-stat">
-    <div class="val" id="positiveCount">0</div>
-    <div class="lbl">POSITIVE</div>
-  </div>
-  <div class="bottom-stat">
-    <div class="val" id="neutralCount">0</div>
-    <div class="lbl">NEUTRAL</div>
-  </div>
-  <div class="bottom-stat">
-    <div class="val" id="negativeCount">0</div>
-    <div class="lbl">NEGATIVE</div>
-  </div>
   <button class="reset-btn" onclick="resetAll()">Reset All</button>
 </div>
 
@@ -374,7 +358,7 @@ function renderContent() {
         : val * 10;
       const color = getColor(Math.max(0, pct));
       html += `
-        <div class="card" id="card_${f.id}" style="border-color:${color}33">
+        <div class="card" id="card_${f.id}" style="border-color:${color}">
           <div class="card-name">${f.name}</div>
           <div class="slider-wrap">
             <div class="slider-val" id="val_${f.id}" style="color:${color}">${val}</div>
@@ -405,7 +389,7 @@ function renderContent() {
       const pct = val * 10;
       const color = getColor(pct);
       html += `
-        <div class="card" id="card_${f.id}" style="border-color:${color}33">
+        <div class="card" id="card_${f.id}" style="border-color:${color}">
           <div class="card-name">${f.name}</div>
           <div class="slider-wrap">
             <div class="slider-val" id="val_${f.id}" style="color:${color}">${val}</div>
@@ -443,7 +427,7 @@ function onSlide(factorId, val, catId) {
   if (valEl) { valEl.textContent = val; valEl.style.color = color; }
 
   const card = document.getElementById('card_' + factorId);
-  if (card) card.style.borderColor = color + '33';
+  if (card) card.style.borderColor = color;
 
   // Update category score
   if (catId === 'baseline') {
@@ -479,27 +463,6 @@ function updateAll() {
   document.getElementById('mainPct').textContent = pct + '%';
   document.getElementById('mainPct').style.color = color;
 
-  // Counts
-  let pos = 0, neu = 0, neg = 0;
-  const allFactors = [...baseline, ...categories.flatMap(c => c.factors)];
-  allFactors.forEach(f => {
-    const v = values[f.id] ?? f.default;
-    let eff;
-    if (f.bell) {
-      eff = 10 - Math.abs(v - 5) * 1.6;
-    } else {
-      eff = v;
-    }
-    if (eff >= 7) pos++;
-    else if (eff >= 4) neu++;
-    else neg++;
-  });
-  document.getElementById('positiveCount').textContent = pos;
-  document.getElementById('positiveCount').style.color = '#30d158';
-  document.getElementById('neutralCount').textContent = neu;
-  document.getElementById('neutralCount').style.color = '#ffcc00';
-  document.getElementById('negativeCount').textContent = neg;
-  document.getElementById('negativeCount').style.color = '#ff2d55';
 }
 
 function setTab(id) {
