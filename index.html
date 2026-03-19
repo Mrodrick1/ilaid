@@ -138,15 +138,13 @@ const categories = [
     factors: [
       { id: 'hair_day', name: 'Good hair day?', hint: '', weight: 2, default: 5, lo: 'Disaster', hi: 'Gorgeous' },
       { id: 'feeling_pretty', name: 'Is she feeling pretty today?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes' },
-      { id: 'laughed', name: 'Did you sincerely laugh at her jokes?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes, genuinely' },
-      { id: 'noticed', name: 'Did you notice something and tell her?', hint: '', weight: 2, default: 5, lo: 'Nothing', hi: 'Yes' },
+      { id: 'laughed', name: 'Did you laugh at her jokes?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes' },
       { id: 'listened', name: 'Did she vent and you just listened?', hint: '', weight: 2, default: 5, lo: 'No / fixed it', hi: 'Just listened' },
-      { id: 'remembered', name: 'Did you remember something she said?', hint: '', weight: 2, default: 5, lo: 'Forgot', hi: 'Remembered' },
-      { id: 'phone_down', name: 'Phone down when she talked?', hint: '', weight: 2, default: 5, lo: 'Scrolling', hi: 'Full attention' },
+      { id: 'phone', name: 'Were you looking at your phone when she talked?', hint: '', weight: 2, default: 5, lo: 'Yes', hi: 'No, focused' },
       { id: 'caught_looking', name: 'Did she catch you looking at her?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes' },
       { id: 'without_asking', name: 'Handle something without being asked?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes' },
       { id: 'asked_day', name: 'Asked about her day and listened?', hint: '', weight: 2, default: 5, lo: 'Nope', hi: 'Yes, really' },
-      { id: 'surprise', name: 'Small surprise or gesture?', hint: '', weight: 2, default: 5, lo: 'Nothing', hi: 'Yes' },
+      { id: 'mansplain', name: 'Did you try to mansplain something?', hint: '', weight: 2, default: 10, lo: 'Yes', hi: 'No' },
     ]
   },
   {
@@ -154,11 +152,10 @@ const categories = [
     // TARGET: ~30% of daily score. Total weight: 54
     factors: [
       { id: 'conflict', name: 'Any arguments or tension?', hint: '', weight: 10, default: 5, lo: 'Big fight', hi: 'All good' },
-      { id: 'chores', name: 'Did you help around the house?', hint: '', weight: 10, default: 5, lo: 'Did nothing', hi: 'Full partner' },
-      { id: 'appreciated', name: 'Did you make her feel valued?', hint: '', weight: 9, default: 5, lo: 'Invisible', hi: 'Very valued' },
+      { id: 'chores', name: 'Did you do the dishes?', hint: '', weight: 10, default: 5, lo: 'No', hi: 'Yes' },
       { id: 'nonsextouch', name: 'Non-sexual affection today?', hint: '', weight: 8, default: 5, lo: 'None', hi: 'Lots' },
       { id: 'qualtime', name: 'Quality time together?', hint: '', weight: 8, default: 5, lo: 'None', hi: 'Great time' },
-      { id: 'pressure', name: 'Is she feeling pressured?', hint: '', weight: 10, default: 7, lo: 'Pressured', hi: 'No pressure' },
+      { id: 'already_tried', name: 'Did you already try today and failed?', hint: '', weight: 10, default: 10, lo: 'Yes', hi: 'No' },
     ]
   },
   {
@@ -176,7 +173,7 @@ const categories = [
     // TARGET: ~15% of daily score. Total weight: 30
     factors: [
       { id: 'energy_now', name: 'How is her energy?', hint: '', weight: 9, default: 5, lo: 'Exhausted', hi: 'Energized' },
-      { id: 'pain', name: 'Any pain, cramps, headache?', hint: '', weight: 7, default: 7, lo: 'In pain', hi: 'Pain-free' },
+      { id: 'pain', name: 'Any pain, cramps, headache?', hint: '', weight: 7, default: 3, lo: 'Pain-free', hi: 'In pain', invert: true },
       { id: 'sleep', name: 'How did she sleep?', hint: '', weight: 8, default: 5, lo: 'Terrible', hi: 'Great' },
     ]
   },
@@ -292,6 +289,8 @@ function calculate() {
       if (f.bell) {
         normalized = 10 - Math.abs(val - 5) * 1.6;
         normalized = Math.max(0, Math.min(10, normalized));
+      } else if (f.invert) {
+        normalized = 10 - val;
       } else {
         normalized = val;
       }
@@ -312,6 +311,8 @@ function getCategoryScore(cat) {
     if (f.bell) {
       val = 10 - Math.abs(val - 5) * 1.6;
       val = Math.max(0, Math.min(10, val));
+    } else if (f.invert) {
+      val = 10 - val;
     }
     s += val * f.weight;
     w += f.weight * 10;
@@ -355,6 +356,7 @@ function renderContent() {
       const val = values[f.id] ?? f.default;
       const pct = f.bell
         ? Math.max(0, Math.round((10 - Math.abs(val - 5) * 1.6) / 10 * 100))
+        : f.invert ? (10 - val) * 10
         : val * 10;
       const color = getColor(Math.max(0, pct));
       html += `
@@ -419,6 +421,8 @@ function onSlide(factorId, val, catId) {
   let pct;
   if (factor && factor.bell) {
     pct = Math.max(0, Math.round((10 - Math.abs(val - 5) * 1.6) / 10 * 100));
+  } else if (factor && factor.invert) {
+    pct = (10 - val) * 10;
   } else {
     pct = val * 10;
   }
