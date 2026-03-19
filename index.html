@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ilaid</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg: #000; --card: #111; --border: #222;
+    --red: #ff2d55; --yellow: #ffcc00; --green: #30d158;
+    --cyan: #64d2ff; --text: #fff; --text2: #888;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+    min-height: 100vh; padding: 0 0 120px 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* TOP HERO */
+  .hero {
+    text-align: center; padding: 40px 20px 20px;
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(0,0,0,0.92); backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+  .hero h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .main-ring-wrap { display: inline-block; position: relative; width: 140px; height: 140px; }
+  .main-ring-wrap canvas { width: 140px; height: 140px; }
+  .main-pct {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 36px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .main-label { font-size: 12px; color: var(--text2); margin-top: 8px; }
+
+  /* CATEGORY TABS */
+  .tabs {
+    display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0; padding: 6px 14px; border-radius: 0; border: none;
+    background: transparent; border-bottom: 2px solid transparent;
+    font-size: 12px; color: var(--text2); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab.active { color: var(--text); border-bottom-color: #fff; }
+
+  /* GRID */
+  .grid {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 10px; padding: 12px 16px;
+  }
+  .card {
+    background: var(--card); border-radius: 16px; padding: 12px;
+    border: 1px solid var(--border); transition: border-color 0.3s;
+  }
+  .card-name { font-size: 12px; font-weight: 500; line-height: 1.3; margin-bottom: 10px; }
+  .slider-wrap { position: relative; }
+  .slider {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; border-radius: 2px;
+    background: #333; outline: none;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; cursor: pointer; border: 2px solid #555;
+  }
+  .slider-val {
+    position: absolute; right: 0; top: -16px;
+    font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+
+  /* CATEGORY SCORE BAR */
+  .cat-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; margin-top: 4px;
+  }
+  .cat-title { font-size: 14px; font-weight: 600; }
+  .cat-score {
+    font-size: 13px; font-weight: 600; padding: 3px 10px;
+    border-radius: 12px; font-variant-numeric: tabular-nums;
+  }
+
+  /* BOTTOM BAR */
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.92); backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 12px 16px 28px;
+  }
+  .bottom-stat { text-align: center; }
+  .bottom-stat .val { font-size: 20px; font-weight: 700; }
+  .bottom-stat .lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+  .reset-btn {
+    background: #222; border: 1px solid #333; color: var(--text);
+    padding: 8px 16px; border-radius: 20px; font-size: 12px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>ilaid</h1>
+  <div class="main-ring-wrap">
+    <canvas id="mainRing" width="280" height="280"></canvas>
+    <div class="main-pct" id="mainPct">50%</div>
+  </div>
+</div>
+
+<div class="tabs" id="tabs"></div>
+<div id="content"></div>
+
+<div class="bottom-bar">
+  <div class="bottom-stat">
+    <div class="val" id="positiveCount">0</div>
+    <div class="lbl">POSITIVE</div>
+  </div>
+  <div class="bottom-stat">
+    <div class="val" id="neutralCount">0</div>
+    <div class="lbl">NEUTRAL</div>
+  </div>
+  <div class="bottom-stat">
+    <div class="val" id="negativeCount">0</div>
+    <div class="lbl">NEGATIVE</div>
+  </div>
+  <button class="reset-btn" onclick="resetAll()">Reset All</button>
+</div>
+
+<script>
+// ─── DATA MODEL ───
+// Every factor is phrased as something you can self-report.
+// "lo" = slider left label, "hi" = slider right label
+// bell: true means middle value (5) is optimal (e.g. alcohol)
+// ─── THE BIG 4 (ceiling modifier) ───
+const baseline = [
+  { id: 'cycle_day', name: 'Where in her cycle?', weight: 10, default: 5, lo: 'Period', hi: 'Ovulating' },
+  { id: 'meds_libido', name: 'Do her meds affect her drive?', weight: 10, default: 8, lo: 'Noticeably lower', hi: 'No impact' },
+  { id: 'birthcontrol', name: 'Does birth control affect her drive?', weight: 7, default: 10, lo: 'Noticeably lower', hi: 'No impact' },
+  { id: 'trust', name: 'General trust level?', weight: 10, default: 7, lo: 'Broken', hi: 'Solid' },
+];
+
+// ─── DAILY CATEGORIES (30 factors, ~30% / ~20% / ~15% / ~15% / ~20%) ───
+const categories = [
+  {
+    id: 'littlethings', name: 'The Little Big Things', icon: '',
+    // ~10-12% of daily. Low weight each, but many. Total weight: ~36
+    factors: [
+      { id: 'hair_day', name: 'Good hair day?', hint: '', weight: 2, default: 5, lo: 'Disaster', hi: 'Gorgeous' },
+      { id: 'feeling_pretty', name: 'Is she feeling pretty today?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes' },
+      { id: 'laughed', name: 'Did you sincerely laugh at her jokes?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes, genuinely' },
+      { id: 'noticed', name: 'Did you notice something and tell her?', hint: '', weight: 2, default: 5, lo: 'Nothing', hi: 'Yes' },
+      { id: 'listened', name: 'Did she vent and you just listened?', hint: '', weight: 2, default: 5, lo: 'No / fixed it', hi: 'Just listened' },
+      { id: 'remembered', name: 'Did you remember something she said?', hint: '', weight: 2, default: 5, lo: 'Forgot', hi: 'Remembered' },
+      { id: 'phone_down', name: 'Phone down when she talked?', hint: '', weight: 2, default: 5, lo: 'Scrolling', hi: 'Full attention' },
+      { id: 'caught_looking', name: 'Did she catch you looking at her?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes' },
+      { id: 'without_asking', name: 'Handle something without being asked?', hint: '', weight: 2, default: 5, lo: 'No', hi: 'Yes' },
+      { id: 'asked_day', name: 'Asked about her day and listened?', hint: '', weight: 2, default: 5, lo: 'Nope', hi: 'Yes, really' },
+      { id: 'surprise', name: 'Small surprise or gesture?', hint: '', weight: 2, default: 5, lo: 'Nothing', hi: 'Yes' },
+    ]
+  },
+  {
+    id: 'relationship', name: 'You Today', icon: '',
+    // TARGET: ~30% of daily score. Total weight: 54
+    factors: [
+      { id: 'conflict', name: 'Any arguments or tension?', hint: '', weight: 10, default: 5, lo: 'Big fight', hi: 'All good' },
+      { id: 'chores', name: 'Did you help around the house?', hint: '', weight: 10, default: 5, lo: 'Did nothing', hi: 'Full partner' },
+      { id: 'appreciated', name: 'Did you make her feel valued?', hint: '', weight: 9, default: 5, lo: 'Invisible', hi: 'Very valued' },
+      { id: 'nonsextouch', name: 'Non-sexual affection today?', hint: '', weight: 8, default: 5, lo: 'None', hi: 'Lots' },
+      { id: 'qualtime', name: 'Quality time together?', hint: '', weight: 8, default: 5, lo: 'None', hi: 'Great time' },
+      { id: 'pressure', name: 'Is she feeling pressured?', hint: '', weight: 10, default: 7, lo: 'Pressured', hi: 'No pressure' },
+    ]
+  },
+  {
+    id: 'mood', name: 'Her Mood', icon: '',
+    // TARGET: ~20% of daily score. Total weight: 37
+    factors: [
+      { id: 'mood_now', name: 'How is her mood right now?', hint: '', weight: 10, default: 5, lo: 'Terrible', hi: 'Amazing' },
+      { id: 'stress', name: 'How stressed or overwhelmed?', hint: '', weight: 10, default: 5, lo: 'Drowning', hi: 'Zen' },
+      { id: 'accomplish', name: 'Did she have a good day?', hint: '', weight: 7, default: 5, lo: 'Rough day', hi: 'Great day' },
+      { id: 'safety', name: 'Does she seem open or guarded?', hint: '', weight: 7, default: 7, lo: 'Walls up', hi: 'Open' },
+    ]
+  },
+  {
+    id: 'body', name: 'Her Body', icon: '',
+    // TARGET: ~15% of daily score. Total weight: 30
+    factors: [
+      { id: 'energy_now', name: 'How is her energy?', hint: '', weight: 9, default: 5, lo: 'Exhausted', hi: 'Energized' },
+      { id: 'pain', name: 'Any pain, cramps, headache?', hint: '', weight: 7, default: 7, lo: 'In pain', hi: 'Pain-free' },
+      { id: 'sleep', name: 'How did she sleep?', hint: '', weight: 8, default: 5, lo: 'Terrible', hi: 'Great' },
+    ]
+  },
+  {
+    id: 'signals', name: 'Signals', icon: '',
+    // TARGET: ~15% of daily score. Total weight: 27
+    factors: [
+      { id: 'flirty', name: 'Is she being flirty?', hint: '', weight: 8, default: 5, lo: 'Not at all', hi: 'Very' },
+      { id: 'libido_hints', name: 'Any sexual comments or hints?', hint: '', weight: 7, default: 5, lo: 'Zero', hi: 'Several' },
+      { id: 'outfit', name: 'Did she put effort into her look?', hint: '', weight: 5, default: 5, lo: 'Sweats', hi: 'Dressed up' },
+      { id: 'touch_receptive', name: 'Receptive to your touch?', hint: '', weight: 9, default: 5, lo: 'Pulls away', hi: 'Leans in' },
+    ]
+  },
+  {
+    id: 'setting', name: 'Setting', icon: '',
+    // TARGET: ~20% of daily score. Total weight: 36
+    factors: [
+      { id: 'privacy', name: 'Privacy right now?', hint: '', weight: 10, default: 5, lo: 'None', hi: 'Totally private' },
+      { id: 'time', name: 'Time pressure or relaxed?', hint: '', weight: 7, default: 5, lo: 'Rushed', hi: 'All night' },
+      { id: 'alcohol', name: 'Drinks tonight?', hint: '', weight: 5, default: 0, lo: 'None', hi: '5+', bell: true },
+      { id: 'ambiance', name: 'Room vibe?', hint: '', weight: 3, default: 5, lo: 'Harsh', hi: 'Romantic' },
+      { id: 'fullness', name: 'How full from dinner?', hint: '', weight: 3, default: 5, lo: 'Starving', hi: 'Stuffed', bell: true },
+      { id: 'scent', name: 'Do you smell good?', hint: '', weight: 3, default: 5, lo: 'Not great', hi: 'Fresh' },
+    ]
+  },
+];
+
+// ─── STATE ───
+let values = {};
+let activeTab = 'all';
+
+function init() {
+  const saved = localStorage.getItem('desire_values');
+  if (saved) {
+    values = JSON.parse(saved);
+  } else {
+    baseline.forEach(f => { values[f.id] = f.default; });
+    categories.forEach(cat => cat.factors.forEach(f => {
+      values[f.id] = f.default;
+    }));
+  }
+  renderTabs();
+  renderContent();
+  updateAll();
+}
+
+// ─── RING DRAWING ───
+function drawRing(canvas, pct, size) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2;
+  const radius = (Math.min(w, h) / 2) - (size === 'big' ? 16 : 4);
+  const lineW = size === 'big' ? 18 : 5;
+
+  // Background ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = lineW;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Colored ring
+  const color = pct < 33 ? '#ff2d55' : pct < 66 ? '#ffcc00' : '#30d158';
+  const startAngle = -Math.PI / 2;
+  const endAngle = startAngle + (Math.PI * 2 * (pct / 100));
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, startAngle, endAngle);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineW;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Glow
+  if (size === 'big') {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, startAngle, endAngle);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW + 8;
+    ctx.globalAlpha = 0.15;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  return color;
+}
+
+// ─── CALCULATE ───
+function getBaselineCeiling() {
+  let s = 0, w = 0;
+  baseline.forEach(f => {
+    const val = values[f.id] ?? f.default;
+    s += val * f.weight;
+    w += f.weight * 10;
+  });
+  // Ceiling ranges from 0.15 (worst combo) to 1.0 (no meds, high trust)
+  return 0.15 + 0.85 * (s / w);
+}
+
+function calculate() {
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+
+  categories.forEach(cat => {
+    cat.factors.forEach(f => {
+      const val = values[f.id] ?? f.default;
+      let normalized;
+      if (f.bell) {
+        normalized = 10 - Math.abs(val - 5) * 1.6;
+        normalized = Math.max(0, Math.min(10, normalized));
+      } else {
+        normalized = val;
+      }
+      totalWeightedScore += normalized * f.weight;
+      totalWeight += f.weight * 10;
+    });
+  });
+
+  const dailyScore = totalWeightedScore / totalWeight;
+  const ceiling = getBaselineCeiling();
+  return Math.round(dailyScore * ceiling * 100);
+}
+
+function getCategoryScore(cat) {
+  let s = 0, w = 0;
+  cat.factors.forEach(f => {
+    let val = values[f.id] ?? f.default;
+    if (f.bell) {
+      val = 10 - Math.abs(val - 5) * 1.6;
+      val = Math.max(0, Math.min(10, val));
+    }
+    s += val * f.weight;
+    w += f.weight * 10;
+  });
+  return Math.round((s / w) * 100);
+}
+
+function getColor(pct) {
+  return pct < 33 ? '#ff2d55' : pct < 66 ? '#ffcc00' : '#30d158';
+}
+
+// ─── RENDER ───
+function renderTabs() {
+  const el = document.getElementById('tabs');
+  let html = `<div class="tab ${activeTab === 'all' ? 'active' : ''}" onclick="setTab('all')">All</div>`;
+  categories.forEach(c => {
+    html += `<div class="tab ${activeTab === c.id ? 'active' : ''}" onclick="setTab('${c.id}')">${c.name}</div>`;
+  });
+  html += `<div class="tab ${activeTab === 'baseline' ? 'active' : ''}" onclick="setTab('baseline')">The Big 4</div>`;
+  el.innerHTML = html;
+}
+
+function renderContent() {
+  const el = document.getElementById('content');
+  let html = '';
+
+  // Daily categories
+  const cats = activeTab === 'all' ? categories :
+    activeTab === 'baseline' ? [] :
+    categories.filter(c => c.id === activeTab);
+
+  cats.forEach(cat => {
+    const score = getCategoryScore(cat);
+    const color = getColor(score);
+    html += `<div class="cat-header">
+      <div class="cat-title">${cat.name}</div>
+      <div class="cat-score" style="background:${color}22;color:${color}" id="catscore_${cat.id}">${score}%</div>
+    </div>`;
+    html += `<div class="grid">`;
+    cat.factors.forEach(f => {
+      const val = values[f.id] ?? f.default;
+      const pct = f.bell
+        ? Math.max(0, Math.round((10 - Math.abs(val - 5) * 1.6) / 10 * 100))
+        : val * 10;
+      const color = getColor(Math.max(0, pct));
+      html += `
+        <div class="card" id="card_${f.id}" style="border-color:${color}33">
+          <div class="card-name">${f.name}</div>
+          <div class="slider-wrap">
+            <div class="slider-val" id="val_${f.id}" style="color:${color}">${val}</div>
+            <input type="range" class="slider" min="0" max="10" value="${val}"
+              oninput="onSlide('${f.id}', this.value, '${cat.id}')"
+              style="accent-color:${color}">
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span style="font-size:8px;color:#555">${f.lo || '0'}</span>
+              <span style="font-size:8px;color:#555">${f.hi || '10'}</span>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  });
+
+  // The Big 4 (at the bottom)
+  if (activeTab === 'all' || activeTab === 'baseline') {
+    const ceil = Math.round(getBaselineCeiling() * 100);
+    const ceilColor = getColor(ceil);
+    html += `<div class="cat-header">
+      <div class="cat-title">The Big 4</div>
+      <div class="cat-score" style="background:${ceilColor}22;color:${ceilColor}" id="catscore_baseline">Ceiling: ${ceil}%</div>
+    </div>`;
+    html += `<div class="grid">`;
+    baseline.forEach(f => {
+      const val = values[f.id] ?? f.default;
+      const pct = val * 10;
+      const color = getColor(pct);
+      html += `
+        <div class="card" id="card_${f.id}" style="border-color:${color}33">
+          <div class="card-name">${f.name}</div>
+          <div class="slider-wrap">
+            <div class="slider-val" id="val_${f.id}" style="color:${color}">${val}</div>
+            <input type="range" class="slider" min="0" max="10" value="${val}"
+              oninput="onSlide('${f.id}', this.value, 'baseline')"
+              style="accent-color:${color}">
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span style="font-size:8px;color:#555">${f.lo || '0'}</span>
+              <span style="font-size:8px;color:#555">${f.hi || '10'}</span>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
+
+}
+
+function onSlide(factorId, val, catId) {
+  val = parseInt(val);
+  values[factorId] = val;
+  localStorage.setItem('desire_values', JSON.stringify(values));
+
+  const factor = categories.flatMap(c => c.factors).find(f => f.id === factorId);
+  let pct;
+  if (factor && factor.bell) {
+    pct = Math.max(0, Math.round((10 - Math.abs(val - 5) * 1.6) / 10 * 100));
+  } else {
+    pct = val * 10;
+  }
+  const color = getColor(pct);
+  const valEl = document.getElementById('val_' + factorId);
+  if (valEl) { valEl.textContent = val; valEl.style.color = color; }
+
+  const card = document.getElementById('card_' + factorId);
+  if (card) card.style.borderColor = color + '33';
+
+  // Update category score
+  if (catId === 'baseline') {
+    const ceil = Math.round(getBaselineCeiling() * 100);
+    const cColor = getColor(ceil);
+    const cEl = document.getElementById('catscore_baseline');
+    if (cEl) {
+      cEl.textContent = 'Ceiling: ' + ceil + '%';
+      cEl.style.color = cColor;
+      cEl.style.background = cColor + '22';
+    }
+  } else {
+    const cat = categories.find(c => c.id === catId);
+    if (cat) {
+      const cs = getCategoryScore(cat);
+      const cColor = getColor(cs);
+      const cEl = document.getElementById('catscore_' + catId);
+      if (cEl) {
+        cEl.textContent = cs + '%';
+        cEl.style.color = cColor;
+        cEl.style.background = cColor + '22';
+      }
+    }
+  }
+
+  updateAll();
+}
+
+function updateAll() {
+  const pct = calculate();
+  const mainCanvas = document.getElementById('mainRing');
+  const color = drawRing(mainCanvas, pct, 'big');
+  document.getElementById('mainPct').textContent = pct + '%';
+  document.getElementById('mainPct').style.color = color;
+
+  // Counts
+  let pos = 0, neu = 0, neg = 0;
+  const allFactors = [...baseline, ...categories.flatMap(c => c.factors)];
+  allFactors.forEach(f => {
+    const v = values[f.id] ?? f.default;
+    let eff;
+    if (f.bell) {
+      eff = 10 - Math.abs(v - 5) * 1.6;
+    } else {
+      eff = v;
+    }
+    if (eff >= 7) pos++;
+    else if (eff >= 4) neu++;
+    else neg++;
+  });
+  document.getElementById('positiveCount').textContent = pos;
+  document.getElementById('positiveCount').style.color = '#30d158';
+  document.getElementById('neutralCount').textContent = neu;
+  document.getElementById('neutralCount').style.color = '#ffcc00';
+  document.getElementById('negativeCount').textContent = neg;
+  document.getElementById('negativeCount').style.color = '#ff2d55';
+}
+
+function setTab(id) {
+  activeTab = id;
+  renderTabs();
+  renderContent();
+}
+
+function resetAll() {
+  baseline.forEach(f => { values[f.id] = f.default; });
+  categories.forEach(cat => cat.factors.forEach(f => {
+    values[f.id] = f.default;
+  }));
+  localStorage.removeItem('desire_values');
+  renderContent();
+  updateAll();
+}
+
+init();
+</script>
+</body>
+</html>
